@@ -2,7 +2,10 @@
 // const jsQR = require('jsqr');
 // const { createCanvas, loadImage } = require('canvas');
 import escpos from 'escpos';
-
+// USB module must be imported separately
+import USB from 'escpos-usb';
+// Initialize escpos
+escpos.USB = USB;
 
 // Setup printer (replace with your printer's USB device or IP address)
 const device = new escpos.USB(); // For USB printers
