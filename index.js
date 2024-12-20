@@ -10,8 +10,12 @@
 
 const printPngFile = require("./lib/labelPrinter.js");
 
-console.log(printPngFile)
+const scanForQRCodesForever = require("./lib/webcam.js");
 
+scanForQRCodesForever();
+
+
+/**
 printPngFile({
   vendorId: 0x04f9,
   productId: 0x2029,
@@ -19,3 +23,5 @@ printPngFile({
   options: { landscape: false, labelWidth: "62-mm-wide continuous" }, //"102-mm-wide continuous"
   compression: { enable: true },
 });
+
+*/
