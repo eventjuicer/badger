@@ -5,7 +5,9 @@
 */
 
 
-import { printPngFile } from "node-brother-label-printer";
+import pkg from 'node-brother-label-printer';
+const { printPngFile } = pkg;
+
 
 printPngFile({
   vendorId: 0x04f9,
