@@ -6,7 +6,9 @@
  * Bus 001 Device 003: ID 04f9:2029 Brother Industries, Ltd QL-580N
 */
 
-const { printPngFile } = require("node-brother-label-printer");
+const printPngFile = require("./lib/labelPrinter.js");
+
+console.log(printPngFile)
 
 printPngFile({
   vendorId: 0x04f9,
