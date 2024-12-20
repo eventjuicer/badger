@@ -10,8 +10,6 @@ escpos.USB = USB;
 // Setup printer (replace with your printer's USB device or IP address)
 const device = new escpos.USB(); // For USB printers
 // const device = new escpos.Network('192.168.1.x'); // For network printers
-const printer = new escpos.Printer(device);
-
 
 // Function to print the QR code information
 const printQRData = (qrData) => {
@@ -30,5 +28,19 @@ const printQRData = (qrData) => {
   console.log("Printed QR Code info.");
 };
 
-// Start capturing and decoding QR codes
-printQRData("Hello, World!");  // Print a test message
+
+
+
+try {
+  device.open(function(error){
+    if(error) {
+      console.error('Printer error:', error);
+      return;
+    }
+    const printer = new escpos.Printer(device);
+    // Print test message
+    printQRData("Hello, World!");
+  });
+} catch (error) {
+  console.error('Error:', error);
+}
