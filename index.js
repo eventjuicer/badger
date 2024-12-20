@@ -1,46 +1,16 @@
 
-// const jsQR = require('jsqr');
-// const { createCanvas, loadImage } = require('canvas');
-import escpos from 'escpos';
-// USB module must be imported separately
-import USB from 'escpos-usb';
-// Initialize escpos
-escpos.USB = USB;
-
-// Setup printer (replace with your printer's USB device or IP address)
-const device = new escpos.USB(); // For USB printers
-// const device = new escpos.Network('192.168.1.x'); // For network printers
-
-// Function to print the QR code information
-const printQRData = (qrData) => {
-  if (!qrData) {
-    console.log("No data to print.");
-    return;
-  }
-
-  printer
-    .text('QR Code Information:')  // Title on the label
-    .text('-----------------------')
-    .text(qrData)  // The QR code content
-    .cut()  // Cut the label after printing
-    .close();  // Close the connection to the printer
-
-  console.log("Printed QR Code info.");
-};
+/**
+ * https://www.npmjs.com/package/node-brother-label-printer
+ * sudo apt-get install build-essential libudev-dev
+*/
 
 
+import { printPngFile } from "node-brother-label-printer";
 
-
-try {
-  device.open(function(error){
-    if(error) {
-      console.error('Printer error:', error);
-      return;
-    }
-    const printer = new escpos.Printer(device);
-    // Print test message
-    printQRData("Hello, World!");
-  });
-} catch (error) {
-  console.error('Error:', error);
-}
+printPngFile({
+  vendorId: 0x04f9,
+  productId: 0x209d,
+  filename: "./sample.png",
+  options: { landscape: false, labelWidth: "62-mm-wide continuous" }, //"102-mm-wide continuous"
+  compression: { enable: true },
+});
