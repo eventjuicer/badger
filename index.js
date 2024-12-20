@@ -5,8 +5,7 @@
 */
 
 
-import pkg from 'node-brother-label-printer';
-const { printPngFile } = pkg;
+const { printPngFile } = require('node-brother-label-printer');
 
 
 printPngFile({
