@@ -28,4 +28,4 @@ const printQRData = (qrData) => {
 };
 
 // Start capturing and decoding QR codes
-printQRData();
+printQRData("Hello, World!");  // Print a test message
