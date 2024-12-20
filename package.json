@@ -1,7 +1,6 @@
 {
   "name": "badger",
   "version": "1.0.0",
-  "type": "module",
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -11,8 +10,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "escpos": "^3.0.0-alpha.6",
-    "escpos-usb": "^3.0.0-alpha.4",
     "node-brother-label-printer": "^1.1.1"
   }
 }

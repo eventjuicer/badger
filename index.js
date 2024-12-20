@@ -2,9 +2,9 @@
 /**
  * https://www.npmjs.com/package/node-brother-label-printer
  * sudo apt-get install build-essential libudev-dev
+ * vendor and product command: lsusb
  * Bus 001 Device 003: ID 04f9:2029 Brother Industries, Ltd QL-580N
 */
-
 
 const { printPngFile } = require("node-brother-label-printer");
 
