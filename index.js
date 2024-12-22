@@ -10,7 +10,6 @@
 
 const printPngFile = require("./lib/labelPrinter.js");
 
-const scanForQRCodesForever = require("./lib/webcam.js");
 
 //printPngFile();
 
