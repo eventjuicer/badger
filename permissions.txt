@@ -1,0 +1,176 @@
+ ls -l /dev/hidraw*
+crw------- 1 root root 242, 0 Nov 19 14:44 /dev/hidraw0
+crw------- 1 root root 242, 1 Nov 19 14:44 /dev/hidraw1
+crw------- 1 root root 242, 2 Nov 19 14:44 /dev/hidraw2
+crw------- 1 root root 242, 3 Dec 22 11:45 /dev/hidraw3
+crw------- 1 root root 242, 4 Dec 22 11:45 /dev/hidraw4
+eventjuicer@badge1:~/badger/lib $ sudo groupadd hidaccess
+eventjuicer@badge1:~/badger/lib $ getent group hidaccess
+hidaccess:x:1001:
+eventjuicer@badge1:~/badger/lib $ sudo usermod -aG hidaccess eventjuicer
+
+
+
+lsusb
+======
+0581:0115
+
+
+sudo nano /etc/udev/rules.d/99-hidaccess.rules
+
+
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0581", ATTRS{idProduct}=="0115", MODE="0660", GROUP="hidaccess"
+
+
+
+
+
+
+
+
+
+
+a. Adjust User Group Membership
+Ensure that the user running the script via SSH is part of the input or hidraw group.
+
+Add User to input Group:
+
+bash
+Copy code
+sudo usermod -aG input your_username
+Replace your_username with your actual username.
+Add User to hidraw Group:
+
+bash
+Copy code
+sudo usermod -aG hidraw your_username
+Apply Changes:
+
+Log Out and Log Back In: Group membership changes require re-login to take effect.
+
+Verify Membership:
+
+bash
+Copy code
+groups your_username
+b. Modify Udev Rules for Device Permissions
+Creating a udev rule ensures that your user has appropriate permissions whenever the device is connected.
+
+Create a Udev Rule File:
+
+bash
+Copy code
+sudo nano /etc/udev/rules.d/99-barcode-scanner.rules
+Add the Following Line:
+
+Replace 046d (VID) and c534 (PID) with your device's actual Vendor ID and Product ID.
+
+makefile
+Copy code
+SUBSYSTEM=="usb", ATTR{idVendor}=="046d", ATTR{idProduct}=="c534", MODE="0660", GROUP="hidraw"
+Explanation:
+SUBSYSTEM=="usb": Applies the rule to USB devices.
+ATTR{idVendor}=="046d": Matches the Vendor ID.
+ATTR{idProduct}=="c534": Matches the Product ID.
+MODE="0660": Sets read and write permissions for the owner and group.
+GROUP="hidraw": Assigns the device to the hidraw group.
+Reload Udev Rules and Trigger Changes:
+
+bash
+Copy code
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+Verify Permissions:
+
+bash
+Copy code
+ls -l /dev/hidraw* /dev/input/event*
+Ensure that the device files now have hidraw group ownership with read and write permissions.
+
+c. Ensure No Conflicting Kernel Drivers
+If a kernel driver is actively managing the device, it might prevent node-hid from accessing it. To resolve this:
+
+Unbind the Device from the Kernel Driver:
+
+Warning: Unbinding a device from its kernel driver can disrupt its functionality. Proceed with caution and ensure that the device isn't needed for other system operations.
+
+bash
+Copy code
+# Find the device's bus and device numbers using lsusb
+lsusb
+Sample Output:
+
+yaml
+Copy code
+Bus 001 Device 005: ID 046d:c534 Logitech, Inc. USB Barcode Scanner
+Bus Number: 001
+Device Number: 005
+Construct the Device Path:
+
+bash
+Copy code
+lsusb -s 001:005 -v | grep "Driver="
+Sample Output:
+
+makefile
+Copy code
+Driver=usbhid
+Unbind the Driver:
+
+bash
+Copy code
+echo -n "1-1.2:1.0" | sudo tee /sys/bus/usb/drivers/usbhid/unbind
+Note: Replace "1-1.2:1.0" with the correct bus and device numbers formatted appropriately. Use lsusb -t to find the correct path.
+bash
+Copy code
+lsusb -t
+Sample Output:
+
+vbnet
+Copy code
+/:  Bus 02.Port 1: Dev 1, Class=root_hub, Driver=ehci-pci/4p, 480M
+    |__ Port 2: Dev 5, If 0, Class=Human Interface Device, Driver=usbhid, 12M
+Here, the path would be 2-1.2:1.0.
+
+bash
+Copy code
+echo -n "2-1.2:1.0" | sudo tee /sys/bus/usb/drivers/usbhid/unbind
+Rebind the Device (if needed):
+
+If you need to reassign the device back to the kernel driver:
+
+bash
+Copy code
+echo -n "2-1.2:1.0" | sudo tee /sys/bus/usb/drivers/usbhid/bind
+Automate Unbinding (Optional):
+
+If you prefer the device to not be automatically bound to the kernel driver upon connection, you can:
+
+Blacklisting the Driver for Specific Device:
+
+Create a udev rule to prevent usbhid from binding to your barcode scanner.
+
+bash
+Copy code
+sudo nano /etc/udev/rules.d/99-barcode-scanner.rules
+Add the following line:
+
+bash
+Copy code
+ATTRS{idVendor}=="046d", ATTRS{idProduct}=="c534", RUN+="/bin/sh -c 'echo -n $env{BUSNUM}-$env{DEVNUM}:1.0 > /sys/bus/usb/drivers/usbhid/unbind'"
+Explanation: This rule automatically unbinds usbhid from the device when it's connected.
+Reload Udev Rules:
+
+bash
+Copy code
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+Note: This approach requires careful configuration and testing to avoid disrupting other devices.
+
+d. Running the Script with Elevated Permissions (Temporary Solution)
+If adjusting group memberships and udev rules doesn't resolve the issue, as a temporary measure, you can run your Node.js script with sudo to grant it elevated permissions.
+
+bash
+Copy code
+sudo node your_script.js
+Caution: Running scripts as root poses security risks. It's advisable to use this approach only for testing purposes and implement proper permission handling for production environments.

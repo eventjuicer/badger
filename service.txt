@@ -1,0 +1,32 @@
+sudo nano /etc/systemd/system/barcode-scanner.service
+
+
+[Unit]
+Description=Barcode Scanner Service
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/node /path/to/your_script.js
+Restart=always
+User=your_username
+Group=input
+Environment=PATH=/usr/bin:/usr/local/bin
+Environment=NODE_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+
+
+
+Replace /path/to/your_script.js with the actual path to your Node.js script.
+
+Set User and Group appropriately. If you added your user to the input group, ensure the Group is set to input.
+
+
+
+sudo systemctl daemon-reload
+sudo systemctl enable barcode-scanner.service
+sudo systemctl start barcode-scanner.service
+
+
+
