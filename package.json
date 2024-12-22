@@ -10,8 +10,10 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "evdev": "^0.3.0",
     "jimp": "^1.6.0",
     "jsqr": "^1.4.0",
+    "node-hid": "^3.1.2",
     "node-webcam": "^0.8.2",
     "pngparse": "^2.0.1",
     "sharp": "^0.33.5",

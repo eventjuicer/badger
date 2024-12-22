@@ -12,10 +12,10 @@ const printPngFile = require("./lib/labelPrinter.js");
 
 const scanForQRCodesForever = require("./lib/webcam.js");
 
-scanForQRCodesForever();
+//printPngFile();
 
 
-/**
+
 printPngFile({
   vendorId: 0x04f9,
   productId: 0x2029,
@@ -24,4 +24,4 @@ printPngFile({
   compression: { enable: true },
 });
 
-*/
+
