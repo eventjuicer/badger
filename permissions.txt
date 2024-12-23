@@ -21,7 +21,8 @@ sudo nano /etc/udev/rules.d/99-hidaccess.rules
 
 SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0581", ATTRS{idProduct}=="0115", MODE="0660", GROUP="hidaccess"
 
-
+sudo udevadm control --reload-rules
+sudo udevadm trigger
 
 
 
