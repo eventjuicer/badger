@@ -42,14 +42,20 @@ class LocalSocketSender: NSObject, StreamDelegate {
         // Create TCP connection to the specified host and port
         CFStreamCreatePairWithSocketToHost(nil, host as CFString, UInt32(port), &readStream, &writeStream)
         
-        guard let inputStream = readStream?.takeRetainedValue(),
-              let outputStream = writeStream?.takeRetainedValue() else {
+        guard let inputCFStream = readStream?.takeRetainedValue(),
+              let outputCFStream = writeStream?.takeRetainedValue() else {
             print("Failed to create streams")
             return
         }
         
-        self.inputStream = inputStream
-        self.outputStream = outputStream
+        // Bridge CFReadStream and CFWriteStream to InputStream and OutputStream
+        inputStream = inputCFStream as InputStream
+        outputStream = outputCFStream as OutputStream
+        
+        guard let inputStream = inputStream, let outputStream = outputStream else {
+            print("Failed to bridge streams")
+            return
+        }
         
         // Set delegate and schedule streams in the run loop
         inputStream.delegate = self
@@ -183,7 +189,8 @@ class KeyboardMonitor {
     
     private func handleHIDValue(IOHIDValue: IOHIDValue) {
         let element = IOHIDValueGetElement(IOHIDValue)
-        let usage = IOHIDElementGetUsage(element)
+        // Removed 'usage' since it was unused
+        let _ = IOHIDElementGetUsage(element)
         let usagePage = IOHIDElementGetUsagePage(element)
         
         // We're interested in keyboard keys
@@ -193,12 +200,10 @@ class KeyboardMonitor {
         
         let keyCode = IOHIDValueGetIntegerValue(IOHIDValue)
         
-        // In HID, a key event consists of key code and usage flags.
-        // Here, we check if the key is pressed (value == 1)
-        // However, depending on the keyboard, you might need to adjust this logic.
-        // For simplification, we'll assume that any key code received is a key press.
+        // Cast 'keyCode' from 'UInt32' to 'Int'
+        let keyCodeInt = Int(keyCode)
         
-        if let character = keyCodeToCharacter(keyCode: Int(keyCode)) {
+        if let character = keyCodeToCharacter(keyCode: keyCodeInt) {
             inputBuffer.append(character)
             checkForURL()
         }
