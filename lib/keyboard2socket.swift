@@ -22,12 +22,14 @@ struct URLDetector {
 
 // MARK: - Local Socket Sender
 
-class LocalSocketSender {
+class LocalSocketSender: NSObject, StreamDelegate {
     let socketPath: String
     var outputStream: OutputStream?
+    var inputStream: InputStream?
     
     init(socketPath: String) {
         self.socketPath = socketPath
+        super.init()
         setupStream()
     }
     
@@ -36,18 +38,23 @@ class LocalSocketSender {
         var writeStream: Unmanaged<CFWriteStream>?
         CFStreamCreatePairWithSocketToHost(nil, "localhost" as CFString, 12345, &readStream, &writeStream)
         
-        if let writeStream = writeStream?.takeRetainedValue() {
+        if let readStream = readStream?.takeRetainedValue(),
+           let writeStream = writeStream?.takeRetainedValue() {
+            inputStream = readStream
             outputStream = writeStream
+            
+            inputStream?.delegate = self
+            inputStream?.schedule(in: .current, forMode: .default)
+            inputStream?.open()
+            
             outputStream?.open()
         }
     }
     
-   func send(url: String) {
-    guard let outputStream = outputStream else { return }
-    let json: [String: String] = ["url": url]
-    if let jsonData = try? JSONSerialization.data(withJSONObject: json, options: []),
-       let jsonString = String(data: jsonData, encoding: .utf8) {
-        if let data = (jsonString + "\n").data(using: .utf8) {
+    func send(url: String) {
+        guard let outputStream = outputStream else { return }
+        let message = "url:\(url)\n"
+        if let data = message.data(using: .utf8) {
             data.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) in
                 if let baseAddress = buffer.baseAddress?.assumingMemoryBound(to: UInt8.self) {
                     outputStream.write(baseAddress, maxLength: data.count)
@@ -55,8 +62,32 @@ class LocalSocketSender {
             }
         }
     }
+    
+    // StreamDelegate method
+    func stream(_ aStream: Stream, handle eventCode: Stream.Event) {
+        if aStream === inputStream {
+            switch eventCode {
+            case .hasBytesAvailable:
+                if let inputStream = inputStream {
+                    let bufferSize = 1024
+                    var buffer = Array<UInt8>(repeating: 0, count: bufferSize)
+                    let bytesRead = inputStream.read(&buffer, maxLength: bufferSize)
+                    
+                    if bytesRead > 0 {
+                        let response = String(bytes: buffer, encoding: .utf8) ?? ""
+                        print("Received acknowledgment: \(response)")
+                    }
+                }
+            case .errorOccurred:
+                print("Stream encountered an error")
+            default:
+                break
+            }
+        }
     }
 }
+
+
 
 // MARK: - Keyboard Monitor
 
