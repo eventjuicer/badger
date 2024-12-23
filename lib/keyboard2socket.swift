@@ -131,7 +131,8 @@ class LocalSocketSender: NSObject, StreamDelegate {
             }
             
             if numberOfBytesRead > 0 {
-                if let output = String(bytes: buffer, encoding: .utf8) {
+                let data = Data(buffer[0..<numberOfBytesRead])
+                if let output = String(data: data, encoding: .utf8) {
                     print("Received from server: \(output)")
                 }
             }
@@ -169,11 +170,11 @@ class KeyboardMonitor {
         let cfMatchingDict = matchingDict as CFDictionary
         IOHIDManagerSetDeviceMatching(manager, cfMatchingDict)
         
-        // Register callback with correct closure signature
-        IOHIDManagerRegisterInputValueCallback(manager, { context, result, senderIOHIDValue in
+        // Register callback with correct closure signature (4 parameters)
+        IOHIDManagerRegisterInputValueCallback(manager, { (context: UnsafeMutableRawPointer?, result: IOReturn, sender: UnsafeMutableRawPointer?, value: IOHIDValue) in
             guard let context = context else { return }
             let monitor = Unmanaged<KeyboardMonitor>.fromOpaque(context).takeUnretainedValue()
-            monitor.handleHIDValue(IOHIDValue: senderIOHIDValue)
+            monitor.handleHIDValue(IOHIDValue: value)
         }, UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()))
         
         // Schedule the manager with the current run loop
@@ -190,7 +191,7 @@ class KeyboardMonitor {
     private func handleHIDValue(IOHIDValue: IOHIDValue) {
         let element = IOHIDValueGetElement(IOHIDValue)
         // Removed 'usage' since it was unused
-        let _ = IOHIDElementGetUsage(element)
+        // let _ = IOHIDElementGetUsage(element)
         let usagePage = IOHIDElementGetUsagePage(element)
         
         // We're interested in keyboard keys
