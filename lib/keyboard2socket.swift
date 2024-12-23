@@ -20,74 +20,118 @@ struct URLDetector {
     }
 }
 
-// MARK: - Local Socket Sender
+// MARK: - Local TCP Socket Sender
 
 class LocalSocketSender: NSObject, StreamDelegate {
-    let socketPath: String
-    var outputStream: OutputStream?
+    let host: String
+    let port: Int
     var inputStream: InputStream?
+    var outputStream: OutputStream?
     
-    init(socketPath: String) {
-        self.socketPath = socketPath
+    override init() {
+        self.host = "localhost"
+        self.port = 12345
         super.init()
-        setupStream()
+        setupStreams()
     }
     
-    private func setupStream() {
+    private func setupStreams() {
         var readStream: Unmanaged<CFReadStream>?
         var writeStream: Unmanaged<CFWriteStream>?
-        CFStreamCreatePairWithSocketToHost(nil, "localhost" as CFString, 12345, &readStream, &writeStream)
         
-        if let readStream = readStream?.takeRetainedValue(),
-           let writeStream = writeStream?.takeRetainedValue() {
-            inputStream = readStream
-            outputStream = writeStream
-            
-            inputStream?.delegate = self
-            inputStream?.schedule(in: .current, forMode: .default)
-            inputStream?.open()
-            
-            outputStream?.open()
+        // Create TCP connection to the specified host and port
+        CFStreamCreatePairWithSocketToHost(nil, host as CFString, UInt32(port), &readStream, &writeStream)
+        
+        guard let inputStream = readStream?.takeRetainedValue(),
+              let outputStream = writeStream?.takeRetainedValue() else {
+            print("Failed to create streams")
+            return
         }
+        
+        self.inputStream = inputStream
+        self.outputStream = outputStream
+        
+        // Set delegate and schedule streams in the run loop
+        inputStream.delegate = self
+        outputStream.delegate = self
+        
+        inputStream.schedule(in: .current, forMode: .default)
+        outputStream.schedule(in: .current, forMode: .default)
+        
+        // Open the streams
+        inputStream.open()
+        outputStream.open()
     }
     
     func send(url: String) {
-        guard let outputStream = outputStream else { return }
-        let message = "url:\(url)\n"
-        if let data = message.data(using: .utf8) {
-            data.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) in
-                if let baseAddress = buffer.baseAddress?.assumingMemoryBound(to: UInt8.self) {
-                    outputStream.write(baseAddress, maxLength: data.count)
+        guard let outputStream = outputStream else {
+            print("Output stream is not available")
+            return
+        }
+        
+        // Prepare the data to send
+        let message = url + "\n"
+        guard let data = message.data(using: .utf8) else {
+            print("Failed to encode URL to data")
+            return
+        }
+        
+        // Write data to the output stream
+        data.withUnsafeBytes { (buffer: UnsafeRawBufferPointer) in
+            if let baseAddress = buffer.baseAddress?.assumingMemoryBound(to: UInt8.self) {
+                let bytesWritten = outputStream.write(baseAddress, maxLength: data.count)
+                if bytesWritten < 0 {
+                    if let error = outputStream.streamError {
+                        print("Error writing to stream: \(error.localizedDescription)")
+                    }
                 }
             }
         }
     }
     
-    // StreamDelegate method
+    // MARK: - StreamDelegate
+    
     func stream(_ aStream: Stream, handle eventCode: Stream.Event) {
-        if aStream === inputStream {
-            switch eventCode {
-            case .hasBytesAvailable:
-                if let inputStream = inputStream {
-                    let bufferSize = 1024
-                    var buffer = Array<UInt8>(repeating: 0, count: bufferSize)
-                    let bytesRead = inputStream.read(&buffer, maxLength: bufferSize)
-                    
-                    if bytesRead > 0 {
-                        let response = String(bytes: buffer, encoding: .utf8) ?? ""
-                        print("Received acknowledgment: \(response)")
-                    }
-                }
-            case .errorOccurred:
-                print("Stream encountered an error")
-            default:
+        switch eventCode {
+        case .openCompleted:
+            print("Stream opened: \(aStream === inputStream ? "Input" : "Output")")
+        case .hasBytesAvailable:
+            if aStream === inputStream {
+                readAvailableBytes(stream: inputStream!)
+            }
+        case .errorOccurred:
+            if let error = aStream.streamError {
+                print("Stream error: \(error.localizedDescription)")
+            }
+        case .endEncountered:
+            print("Stream ended")
+            aStream.close()
+            aStream.remove(from: .current, forMode: .default)
+        default:
+            break
+        }
+    }
+    
+    private func readAvailableBytes(stream: InputStream) {
+        let bufferSize = 1024
+        var buffer = Array<UInt8>(repeating: 0, count: bufferSize)
+        
+        while stream.hasBytesAvailable {
+            let numberOfBytesRead = stream.read(&buffer, maxLength: bufferSize)
+            
+            if numberOfBytesRead < 0, let error = stream.streamError {
+                print("Stream read error: \(error.localizedDescription)")
                 break
+            }
+            
+            if numberOfBytesRead > 0 {
+                if let output = String(bytes: buffer, encoding: .utf8) {
+                    print("Received from server: \(output)")
+                }
             }
         }
     }
 }
-
-
 
 // MARK: - Keyboard Monitor
 
@@ -104,7 +148,7 @@ class KeyboardMonitor {
     private func setupHIDManager() {
         manager = IOHIDManagerCreate(kCFAllocatorDefault, IOOptionBits(kIOHIDOptionsTypeNone))
         
-        // **Fix 1:** Safely unwrap the optional 'manager'
+        // Safely unwrap the optional 'manager'
         guard let manager = manager else {
             print("Failed to create HID Manager")
             return
@@ -119,21 +163,25 @@ class KeyboardMonitor {
         let cfMatchingDict = matchingDict as CFDictionary
         IOHIDManagerSetDeviceMatching(manager, cfMatchingDict)
         
-        // **Fix 2:** Correct closure to accept four parameters
-        IOHIDManagerRegisterInputValueCallback(manager, { context, result, sender, value in
-            // **Fix 3:** Ensure 'context' is not nil
+        // Register callback with correct closure signature
+        IOHIDManagerRegisterInputValueCallback(manager, { context, result, senderIOHIDValue in
             guard let context = context else { return }
             let monitor = Unmanaged<KeyboardMonitor>.fromOpaque(context).takeUnretainedValue()
-            // **Fix 4:** Pass the correct 'value' parameter
-            monitor.handleHIDValue(IOHIDValue: value)
+            monitor.handleHIDValue(IOHIDValue: senderIOHIDValue)
         }, UnsafeMutableRawPointer(Unmanaged.passUnretained(self).toOpaque()))
         
+        // Schedule the manager with the current run loop
         IOHIDManagerScheduleWithRunLoop(manager, CFRunLoopGetCurrent(), CFRunLoopMode.defaultMode.rawValue)
-        IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+        
+        // Open the HID manager
+        let openResult = IOHIDManagerOpen(manager, IOOptionBits(kIOHIDOptionsTypeNone))
+        if openResult != kIOReturnSuccess {
+            print("Failed to open HID Manager: \(openResult)")
+            return
+        }
     }
     
     private func handleHIDValue(IOHIDValue: IOHIDValue) {
-        // **Fix 5:** Remove 'guard let' since 'IOHIDValueGetElement' returns non-optional
         let element = IOHIDValueGetElement(IOHIDValue)
         let usage = IOHIDElementGetUsage(element)
         let usagePage = IOHIDElementGetUsagePage(element)
@@ -145,12 +193,14 @@ class KeyboardMonitor {
         
         let keyCode = IOHIDValueGetIntegerValue(IOHIDValue)
         
-        // **Fix 6:** Cast 'keyCode' from 'UInt32' to 'Int'
-        if keyCode == 1 { // Assuming '1' signifies a key press event; adjust as needed
-            if let character = keyCodeToCharacter(keyCode: Int(keyCode)) {
-                inputBuffer.append(character)
-                checkForURL()
-            }
+        // In HID, a key event consists of key code and usage flags.
+        // Here, we check if the key is pressed (value == 1)
+        // However, depending on the keyboard, you might need to adjust this logic.
+        // For simplification, we'll assume that any key code received is a key press.
+        
+        if let character = keyCodeToCharacter(keyCode: Int(keyCode)) {
+            inputBuffer.append(character)
+            checkForURL()
         }
     }
     
@@ -198,8 +248,7 @@ class KeyboardMonitor {
 
 // MARK: - Main Execution
 
-let socketPath = "/tmp/url_socket" // Update if needed
-let sender = LocalSocketSender(socketPath: socketPath)
+let sender = LocalSocketSender()
 let monitor = KeyboardMonitor(sender: sender)
 print("Starting Keyboard Monitor...")
 monitor.start()
