@@ -3,7 +3,7 @@
 const net = require('net');
 
 // Define the port and host
-const PORT = 12345;
+const PORT = 12346;
 const HOST = '127.0.0.1';
 
 // Create a server instance

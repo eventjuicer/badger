@@ -30,7 +30,7 @@ class LocalSocketSender: NSObject, StreamDelegate {
     
     override init() {
         self.host = "localhost"
-        self.port = 12345
+        self.port = 12346
         super.init()
         setupStreams()
     }
@@ -190,13 +190,12 @@ class KeyboardMonitor {
     
     private func handleHIDValue(IOHIDValue: IOHIDValue) {
         let element = IOHIDValueGetElement(IOHIDValue)
-        let usagePage = IOHIDElementGetUsagePage(element)
         let value = IOHIDValueGetIntegerValue(IOHIDValue)
         let usage = IOHIDElementGetUsage(element)
         
         // Only process key down events (value = 1) and ignore special keys
         if value == 1 && usage < 0xE0 {
-            print("Raw keycode: 0x\(String(format: "%02X", usage))")  // Let's see the raw keycodes
+            print("Raw keycode: 0x\(String(format: "%02X", usage))")
             if let character = keyCodeToCharacter(keyCode: Int(usage)) {
                 inputBuffer.append(character)
                 
@@ -250,25 +249,22 @@ class KeyboardMonitor {
             
             // Map numeric sequences to actual characters
             let numericToChar: [String: String] = [
-                "104": "h",
-                "116": "t",
-                "112": "p",
-                "115": "s",
-                "58": ":",
-                "47": "/",
-                "101": "e",
-                "99": "c",
-                "111": "o",
-                "109": "m",
-                "46": ".",
-                "98": "b",
-                "114": "r",
-                "108": "l",
-                "105": "i",
-                "110": "n",
-                "122": "z",
-                "121": "y",
-                "107": "k"
+                // Letters (a-z)
+                "97": "a", "98": "b", "99": "c", "100": "d",
+                "101": "e", "102": "f", "103": "g", "104": "h",
+                "105": "i", "106": "j", "107": "k", "108": "l",
+                "109": "m", "110": "n", "111": "o", "112": "p",
+                "113": "q", "114": "r", "115": "s", "116": "t",
+                "117": "u", "118": "v", "119": "w", "120": "x",
+                "121": "y", "122": "z",
+                
+                // Numbers (0-9)
+                "48": "0", "49": "1", "50": "2", "51": "3", "52": "4",
+                "53": "5", "54": "6", "55": "7", "56": "8", "57": "9",
+                
+                // Special characters
+                "45": "-", "46": ".", "43": "+", "95": "_",
+                "58": ":", "47": "/"
             ]
             
             // Split the numeric code into groups of 2-3 digits and translate
@@ -292,7 +288,7 @@ class KeyboardMonitor {
             if let range = result.range(of: "/p/") {
                 let code = String(result[range.upperBound...])
                 print("Extracted code: \(code)")
-                sender.send(url: result)  // Send the complete decoded URL
+                sender.send(url: code)  // Send the complete decoded URL
             }
             
             inputBuffer.removeAll()
