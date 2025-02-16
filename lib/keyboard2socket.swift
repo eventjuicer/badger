@@ -288,7 +288,7 @@ class KeyboardMonitor {
             if let range = result.range(of: "/p/") {
                 let code = String(result[range.upperBound...])
                 print("Extracted code: \(code)")
-                sender.send(url: code)  // Send the complete decoded URL
+                sender.send(url: result)  // Send the complete decoded URL
             }
             
             inputBuffer.removeAll()
