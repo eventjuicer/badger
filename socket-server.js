@@ -25,21 +25,21 @@ import('node-fetch').then(({ default: fetch }) => {
                 console.log('Extracted code:', code);
                 
                 try {
-                    const response = await fetch(`https://ecomm.berlin/api/desk/${code}`, {
-                        method: 'GET',
-                        headers: {
-                            'Accept': 'application/pdf'
-                        }
-                    });
+                    const response = await fetch(`https://ecomm.berlin/api/terminal/${code}`);
+                    const data = await response.json();
                     
-                    if (response.ok) {
+                    if (data?.external_id) {
                         console.log('PDF fetched successfully');
                         
-
                         printPngFile({
+                            imageData: {
+                                fname: data.fname,
+                                lname: data.lname,
+                                cname: data.cname,
+                                qrText: `https://ecomm.berlin/p/${data.code}`,
+                            },
                             vendorId: 0x04f9,
                             productId: 0x2029,
-                            filename: "./sample.png",
                             options: { landscape: true, labelWidth: "62-mm-wide continuous" }, //"102-mm-wide continuous"
                             compression: { enable: true },
                         });
