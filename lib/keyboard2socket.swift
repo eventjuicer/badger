@@ -190,42 +190,38 @@ class KeyboardMonitor {
     
     private func handleHIDValue(IOHIDValue: IOHIDValue) {
         let element = IOHIDValueGetElement(IOHIDValue)
-        // Removed 'usage' since it was unused
-        // let _ = IOHIDElementGetUsage(element)
         let usagePage = IOHIDElementGetUsagePage(element)
+        let value = IOHIDValueGetIntegerValue(IOHIDValue)
+        let usage = IOHIDElementGetUsage(element)
         
-        // We're interested in keyboard keys
-        if usagePage != kHIDPage_KeyboardOrKeypad {
-            return
-        }
-        
-        let keyCode = IOHIDValueGetIntegerValue(IOHIDValue)
-        
-        // Cast 'keyCode' from 'UInt32' to 'Int'
-        let keyCodeInt = Int(keyCode)
-        
-        if let character = keyCodeToCharacter(keyCode: keyCodeInt) {
-            inputBuffer.append(character)
-            checkForURL()
+        // Only process key down events (value = 1) and ignore special keys
+        if value == 1 && usage < 0xE0 {
+            print("Raw keycode: 0x\(String(format: "%02X", usage))")  // Let's see the raw keycodes
+            if let character = keyCodeToCharacter(keyCode: Int(usage)) {
+                inputBuffer.append(character)
+                
+                if character == "\n" {
+                    print("Raw scan: \(inputBuffer)")
+                    processBuffer()
+                }
+            }
         }
     }
     
     private func keyCodeToCharacter(keyCode: Int) -> String? {
-        // Map keycodes to characters. This is simplified and may not handle all cases or keyboard layouts.
+        // Map based on observed scanner output
         let keyMap: [Int: String] = [
-            0x00: "a", 0x01: "s", 0x02: "d", 0x03: "f",
-            0x04: "h", 0x05: "g", 0x06: "z", 0x07: "x",
-            0x08: "c", 0x09: "v", 0x0B: "b", 0x0C: "q",
-            0x0D: "w", 0x0E: "e", 0x0F: "r", 0x10: "y",
-            0x11: "t", 0x12: "1", 0x13: "2", 0x14: "3",
-            0x15: "4", 0x16: "6", 0x17: "5", 0x18: "=",
-            0x19: "9", 0x1A: "7", 0x1B: "-", 0x1C: "8",
-            0x1D: "0", 0x1E: "]", 0x1F: "o", 0x20: "u",
-            0x21: "[", 0x22: "i", 0x23: "p", 0x24: "l",
-            0x25: "j", 0x26: "k", 0x27: ";", 0x28: "\\",
-            0x29: ",", 0x2A: "/", 0x2B: "n", 0x2C: "m",
-            0x2D: ".", 0x2E: "`", 0x2F: " ",
-            // Add more key mappings as needed
+            0x59: "1",  // Most common digit
+            0x5A: "2",
+            0x5B: "3",
+            0x5C: "4",
+            0x5D: "5",
+            0x5E: "6",
+            0x5F: "7",
+            0x60: "8",
+            0x61: "9",
+            0x62: "0",
+            0x28: "\n"  // Enter key
         ]
         
         return keyMap[keyCode]
@@ -244,6 +240,62 @@ class KeyboardMonitor {
         // Limit buffer size to prevent unlimited growth
         if inputBuffer.count > 1000 {
             inputBuffer = String(inputBuffer.suffix(500))
+        }
+    }
+    
+    private func processBuffer() {
+        if !inputBuffer.isEmpty {
+            let scannedCode = inputBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
+            print("Raw numeric code: \(scannedCode)")
+            
+            // Map numeric sequences to actual characters
+            let numericToChar: [String: String] = [
+                "104": "h",
+                "116": "t",
+                "112": "p",
+                "115": "s",
+                "58": ":",
+                "47": "/",
+                "101": "e",
+                "99": "c",
+                "111": "o",
+                "109": "m",
+                "46": ".",
+                "98": "b",
+                "114": "r",
+                "108": "l",
+                "105": "i",
+                "110": "n",
+                "122": "z",
+                "121": "y",
+                "107": "k"
+            ]
+            
+            // Split the numeric code into groups of 2-3 digits and translate
+            var result = ""
+            var current = ""
+            
+            for char in scannedCode {
+                current += String(char)
+                if let letter = numericToChar[current] {
+                    result += letter
+                    current = ""
+                } else if current.count >= 3 {
+                    // Reset if we don't find a match after 3 digits
+                    current = String(char)
+                }
+            }
+            
+            print("Decoded text: \(result)")
+            
+            // Extract just the code part (after /p/)
+            if let range = result.range(of: "/p/") {
+                let code = String(result[range.upperBound...])
+                print("Extracted code: \(code)")
+                sender.send(url: result)  // Send the complete decoded URL
+            }
+            
+            inputBuffer.removeAll()
         }
     }
     
