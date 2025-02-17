@@ -30,7 +30,8 @@ class LocalSocketSender: NSObject, StreamDelegate {
     
     override init() {
         self.host = "localhost"
-        self.port = 12346
+        let arguments = CommandLine.arguments
+        self.port = arguments.count > 1 ? Int(arguments[1]) ?? 12345 : 12345  
         super.init()
         setupStreams()
     }
@@ -197,6 +198,7 @@ class KeyboardMonitor {
         if value == 1 && usage < 0xE0 {
             print("Raw keycode: 0x\(String(format: "%02X", usage))")
             if let character = keyCodeToCharacter(keyCode: Int(usage)) {
+                print("Keycode 0x\(String(format: "%02X", usage)) -> '\(character)'")
                 inputBuffer.append(character)
                 
                 if character == "\n" {
@@ -208,19 +210,29 @@ class KeyboardMonitor {
     }
     
     private func keyCodeToCharacter(keyCode: Int) -> String? {
-        // Map based on observed scanner output
         let keyMap: [Int: String] = [
-            0x59: "1",  // Most common digit
-            0x5A: "2",
-            0x5B: "3",
-            0x5C: "4",
-            0x5D: "5",
-            0x5E: "6",
-            0x5F: "7",
-            0x60: "8",
-            0x61: "9",
-            0x62: "0",
-            0x28: "\n"  // Enter key
+            // Letters (these are correct)
+            0x04: "a", 0x05: "b", 0x06: "c", 0x07: "d",
+            0x08: "e", 0x09: "f", 0x0A: "g", 0x0B: "h",
+            0x0C: "i", 0x0D: "j", 0x0E: "k", 0x0F: "l",
+            0x10: "m", 0x11: "n", 0x12: "o", 0x13: "p",
+            0x14: "q", 0x15: "r", 0x16: "s", 0x17: "t",
+            0x18: "u", 0x19: "v", 0x1A: "w", 0x1B: "x",
+            0x1C: "y", 0x1D: "z",
+            
+            // Numbers (these are correct)
+            0x1E: "1", 0x1F: "2", 0x20: "3", 0x21: "4",
+            0x22: "5", 0x23: "6", 0x24: "7", 0x25: "8",
+            0x26: "9", 0x27: "0",
+            
+            // Special characters - updated mapping
+            0x38: "/",  // Keep as slash (for path separators)
+            0x37: ".",  // Changed to dot (for domain separator)
+            0x33: ":",  // Keep as colon (for https:)
+            0x2D: "-",  // Keep as hyphen
+            
+            // Control
+            0x28: "\n"  // Enter/Return
         ]
         
         return keyMap[keyCode]
@@ -244,51 +256,14 @@ class KeyboardMonitor {
     
     private func processBuffer() {
         if !inputBuffer.isEmpty {
-            let scannedCode = inputBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
-            print("Raw numeric code: \(scannedCode)")
+            let scannedText = inputBuffer.trimmingCharacters(in: .whitespacesAndNewlines)
+            print("Scanned text: \(scannedText)")
             
-            // Map numeric sequences to actual characters
-            let numericToChar: [String: String] = [
-                // Letters (a-z)
-                "97": "a", "98": "b", "99": "c", "100": "d",
-                "101": "e", "102": "f", "103": "g", "104": "h",
-                "105": "i", "106": "j", "107": "k", "108": "l",
-                "109": "m", "110": "n", "111": "o", "112": "p",
-                "113": "q", "114": "r", "115": "s", "116": "t",
-                "117": "u", "118": "v", "119": "w", "120": "x",
-                "121": "y", "122": "z",
-                
-                // Numbers (0-9)
-                "48": "0", "49": "1", "50": "2", "51": "3", "52": "4",
-                "53": "5", "54": "6", "55": "7", "56": "8", "57": "9",
-                
-                // Special characters
-                "45": "-", "46": ".", "43": "+", "95": "_",
-                "58": ":", "47": "/"
-            ]
-            
-            // Split the numeric code into groups of 2-3 digits and translate
-            var result = ""
-            var current = ""
-            
-            for char in scannedCode {
-                current += String(char)
-                if let letter = numericToChar[current] {
-                    result += letter
-                    current = ""
-                } else if current.count >= 3 {
-                    // Reset if we don't find a match after 3 digits
-                    current = String(char)
-                }
-            }
-            
-            print("Decoded text: \(result)")
-            
-            // Extract just the code part (after /p/)
-            if let range = result.range(of: "/p/") {
-                let code = String(result[range.upperBound...])
-                print("Extracted code: \(code)")
-                sender.send(url: result)  // Send the complete decoded URL
+            // Check if it matches our expected URL patterns
+            if scannedText.hasPrefix("https://ecomm.berlin/p/") || 
+               scannedText.hasPrefix("https://expojuicer.com/p/") {
+                print("Valid URL found: \(scannedText)")
+                sender.send(url: scannedText)
             }
             
             inputBuffer.removeAll()
