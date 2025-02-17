@@ -36,12 +36,13 @@ import('node-fetch').then(({ default: fetch }) => {
                                 fname: data.fname,
                                 lname: data.lname,
                                 cname: data.cname,
+                                important: data.important,
                                 qrText: `https://ecomm.berlin/p/${data.code}`,
                             },
                             vendorId: 0x04f9,
-                            productId: 0x2029,
+                            productId: 0x2042,
                             options: { landscape: true, labelWidth: "62-mm-wide continuous" }, //"102-mm-wide continuous"
-                            compression: { enable: true },
+                            compression: { enable: false },
                         });
                         
                     } else {
